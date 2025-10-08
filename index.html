@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AG MUSIC</title>
+  <style>
+    :root{
+      --bg:#0f1724;
+      --card:#111827;
+      --muted:#9ca3af;
+      --accent:#1db954; /* spotify-like green */
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,'Helvetica Neue',Arial;color:#e6eef6;background:linear-gradient(180deg,var(--bg),#051022);}
+    .app{display:flex;height:100vh}
+    .sidebar{width:260px;padding:20px;background:linear-gradient(180deg,#07101a,#07121b);border-right:1px solid rgba(255,255,255,0.03);display:flex;flex-direction:column;gap:16px}
+    .logo{font-size:22px;margin:0;color:var(--accent)}
+    #search{width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    .nav{display:flex;flex-direction:column;gap:8px}
+    .nav-btn{background:transparent;border:none;color:var(--muted);padding:8px;text-align:left;border-radius:8px;cursor:pointer}
+    .nav-btn.active{color:white;background:rgba(255,255,255,0.03)}
+    .playlist-preview{margin-top:auto}
+    .playlist-preview h3{margin:0 0 8px 0;color:var(--muted)}
+    .playlist-preview ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+    .playlist-preview li{display:flex;align-items:center;gap:8px}
+    .playlist-preview img{width:40px;height:40px;border-radius:6px;object-fit:cover}
+
+    .main{flex:1;padding:28px;display:flex;flex-direction:column;gap:20px;overflow:auto}
+    .now-playing{display:flex;gap:20px;align-items:center;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);padding:18px;border-radius:12px}
+    .cover img{width:180px;height:180px;border-radius:12px;object-fit:cover;box-shadow:0 8px 30px rgba(0,0,0,0.6)}
+    .track-info{flex:1}
+    .track-info h2{margin:0 0 6px 0}
+    .track-info p{margin:0 0 14px 0;color:var(--muted)}
+    .controls button{font-size:20px;padding:10px 14px;margin-right:8px;border-radius:8px;border:none;background:rgba(255,255,255,0.03);color:white;cursor:pointer}
+    .progress-container{display:flex;align-items:center;gap:12px;margin-top:12px}
+    .progress-container input[type=range]{flex:1}
+    .volume-row{display:flex;align-items:center;gap:8px;margin-top:12px}
+    .library{background:linear-gradient(180deg,rgba(255,255,255,0.01),transparent);padding:18px;border-radius:12px}
+    .track-list{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+    .track-item{display:flex;gap:10px;align-items:center;padding:10px;border-radius:10px;background:rgba(255,255,255,0.02);cursor:pointer}
+    .track-item img{width:64px;height:64px;border-radius:8px;object-fit:cover}
+    .track-meta{display:flex;flex-direction:column}
+    .track-meta strong{font-size:14px}
+    .track-meta span{font-size:12px;color:var(--muted)}
+    .track-item.playing{background:rgba(29,185,84,0.2)}
+    @media(max-width:800px){
+      .sidebar{display:none}
+      .cover img{width:120px;height:120px}
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <h1 class="logo">AG MUSIC</h1>
+      <input id="search" type="search" placeholder="Cari lagu, album, artis..." />
+      <nav class="nav">
+        <button class="nav-btn active">Home</button>
+        <button class="nav-btn">Library</button>
+        <button class="nav-btn">Browse</button>
+      </nav>
+      <div class="playlist-preview">
+        <h3>Top Picks</h3>
+        <ul id="playlist-preview-list"></ul>
+      </div>
+    </aside>
+
+    <main class="main">
+      <section class="now-playing">
+        <div class="cover">
+          <img id="cover-img" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&q=80" alt="Album cover">
+        </div>
+        <div class="track-info">
+          <h2 id="track-title">Pilih lagu</h2>
+          <p id="track-artist">—</p>
+          <div class="controls">
+            <button id="prev">⏮</button>
+            <button id="play">▶️</button>
+            <button id="next">⏭</button>
+          </div>
+          <div class="progress-container">
+            <span id="current-time">0:00</span>
+            <input id="progress" type="range" min="0" max="100" value="0">
+            <span id="duration">0:00</span>
+          </div>
+          <div class="volume-row">
+            <input id="volume" type="range" min="0" max="1" step="0.01" value="0.8">
+            <label for="volume">Volume</label>
+          </div>
+        </div>
+      </section>
+
+      <section class="library">
+        <h3>Daftar Lagu</h3>
+        <ul id="track-list" class="track-list"></ul>
+      </section>
+    </main>
+  </div>
+
+  <audio id="audio"></audio>
+
+  <script>
+    // 🎶 Daftar Lagu — ganti atau tambahkan lagu di sini
+    const songs = [
+      {
+        id: 1,
+        title: 'Anugerah Terindah',
+        artist: 'ANDMESH',
+        src: 'ANDMESH - ANUGERAH TERINDAH (VIDEO LIRIK) LIRIK LAGU TERBARU [LY5G34x60os].mp3',
+        img: 'https://i.scdn.co/image/ab67616d0000b273e2fc4fcab619222ecdaa7d74'
+      },
+      {
+        id: 2,
+        title: 'Unconditionally',
+        artist: 'Katy Perry',
+        src: 'ketiii.mp3',
+        img: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRgsMiECXRxFjWlxGpRzkJjTG5era9yQ5u7aw&s'
+      },
+      {
+        id: 3,
+        title: 'ours to keep',
+        artist: 'Kendis',
+        src: 'Kendis - ours to keep (feat. adis) (Official Lyric Video) [hv-tflI7pM4].mp3',  
+        img: 'https://i.scdn.co/image/ab67616d0000b273cc8f0f926bc44f4b52452a42' 
+      },
+      {
+  id: 4,
+  title: 'Secret Love Song',
+  artist: 'Little Mix',
+  src: 'Little Mix - Secret Love Song (Lyrics) ft. Jason Derulo.mp3',
+  img: 'https://i1.sndcdn.com/artworks-1ZT6zQOKeQ6acwsb-ICJMTw-t500x500.jpg'
+},      
+{
+        id: 5,
+        title: 'Payphone',
+        artist: 'Maroon 5 Ft. Wiz Khalifa',
+        src: 'Maroon 5 Ft. Wiz Khalifa - Payphone (Lyrics) [12gmxhEFeBo].mp3',
+        img: 'https://i.scdn.co/image/ab67616d0000b27347f25b84e379442bf89e481e'
+      },
+      {
+        id: 6,
+        title: 'Just Give Me a Reason',
+        artist: 'Pink',
+        src: 'P_nk - Just Give Me a Reason (Lyrics) ft. Nate Ruess [-WGsaXnuWMA].mp3',
+        img: 'https://upload.wikimedia.org/wikipedia/id/3/32/Just_Give_Me_a_Reason_cover.png'
+      },
+      {
+        id: 7,
+        title: 'Locked Away',
+        artist: 'R. City ',
+        src: 'R. City - Locked Away ft. Adam Levine [Fdcw4Mby2RI].mp3',
+        img: 'https://i1.sndcdn.com/artworks-000142667028-t6egx1-t500x500.jpg'
+      },
+      {
+        id: 8,
+        title: 'Rewrite The Stars',
+        artist: 'James Arthur feat. Anne Mariet',
+        src: 'Rewrite The Stars - James Arthur feat. Anne Marie [Lyrics_Vietsub] [HiYMlQoFz6c].mp3',
+        img: 'https://i1.sndcdn.com/artworks-rKuY2ZioXqrEbeiL-C09LzA-t500x500.jpg'
+      }, 
+      {
+        id: 9,
+        title: 'Love Story',
+        artist: 'Taylor Swift',
+        src: 'Taylor Swift - Love Story (Lyrics) [KrsqPE9SMxo].mp3',
+        img: 'https://resizing.flixster.com/-XZAfHZM39UwaGJIFWKAE8fS0ak=/v3/t/assets/p2259_p_v10_aa.jpg'
+      },
+      {
+        id: 10,
+        title: 'Message In A Bottle',
+        artist: 'Taylor Swift',
+        src: 'Taylor Swift - Message In A Bottle (Taylor_s Version) (From The Vault) (Lyric Video) [cVaG6adE2mA].mp3',
+        img: 'https://upload.wikimedia.org/wikipedia/id/9/92/Message_in_a_bottle_film.jpg'
+      },
+      {
+        id: 11,
+        title: 'Style',
+        artist: 'Taylor Swift',
+        src: 'Taylor Swift - Style (Taylor_s Version) (Lyric Video).mp3',
+        img: 'https://i1.sndcdn.com/artworks-ZUYZLG2OqDr26sTH-q9OjJQ-t500x500.jpg'
+      },
+      {
+        id: 12,
+        title: 'Bukti',
+        artist: 'Virgoun',
+        src: 'Virgoun - Bukti (Lirik).mp3',
+        img: 'https://i.scdn.co/image/ab67616d0000b2735457738f23011c294db85d54'
+      },
+       {
+        id: 13,
+        title: 'Surat Cinta Untuk Starla',
+        artist: 'Virgoun',
+        src: 'Virgoun - Surat Cinta Untuk Starla (Lirik Lagu).mp3',
+        img: 'https://i.scdn.co/image/ab67616d0000b273cf6af54752ff67e6ce8f86a1'
+      },
+        {
+          id: 14,
+          title: 'Selamat (Selamat Tinggal)',
+          artist: 'Virgoun feat. Audy',
+          src: 'Virgoun feat. Audy - Selamat (Selamat Tinggal)(Lirik Lagu_Lyrics) [H4djtJHbzuc].mp3',
+          img: 'https://thumbor.prod.vidiocdn.com/dDCS-wfYhdjPbaxPXFHsowBlT9I=/filters:quality(70)/vidio-web-prod-video/uploads/video/image/1832982/virgoun-feat-audy-selamat-selamat-tinggal-official-lyric-video-chapter-4-4-4430fa.jpg'
+        },
+        {
+          id: 15,
+          title: 'Where We Are',
+          artist: 'One Direction',
+          src: 'Where We Are - One Direction __ Lyrics Tiktok Version [yYxMH3twnjk].mp3',
+          img: 'https://m.media-amazon.com/images/M/MV5BMTkyMTE0MTQ4Ml5BMl5BanBnXkFtZTgwMDU5MTMwNjE@._V1_FMjpg_UX1000_.jpg'
+        }
+      
+
+      
+
+      
+      
+    ];
+
+    const audio = document.getElementById('audio');
+    const playBtn = document.getElementById('play');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+    const trackTitle = document.getElementById('track-title');
+    const trackArtist = document.getElementById('track-artist');
+    const coverImg = document.getElementById('cover-img');
+    const trackListEl = document.getElementById('track-list');
+    const previewListEl = document.getElementById('playlist-preview-list');
+    const progress = document.getElementById('progress');
+    const currentTimeEl = document.getElementById('current-time');
+    const durationEl = document.getElementById('duration');
+    const volumeEl = document.getElementById('volume');
+    const searchInput = document.getElementById('search');
+
+    let currentIndex = 0;
+    let isPlaying = false;
+
+    function formatTime(sec){
+      if(!sec || isNaN(sec)) return '0:00';
+      const m = Math.floor(sec/60);
+      const s = Math.floor(sec%60).toString().padStart(2,'0');
+      return `${m}:${s}`;
+    }
+
+    function loadTrack(index){
+      const s = songs[index];
+      audio.src = s.src;
+      trackTitle.textContent = s.title;
+      trackArtist.textContent = s.artist;
+      coverImg.src = s.img;
+      document.querySelectorAll('.track-item').forEach((el,i)=>{
+        el.classList.toggle('playing', i===index);
+      });
+    }
+
+    function play(){
+      audio.play();
+      isPlaying = true;
+      playBtn.textContent = '⏸';
+    }
+    function pause(){
+      audio.pause();
+      isPlaying = false;
+      playBtn.textContent = '▶️';
+    }
+
+    playBtn.addEventListener('click', ()=>{ isPlaying ? pause() : play(); });
+    prevBtn.addEventListener('click', ()=>{
+      currentIndex = (currentIndex - 1 + songs.length) % songs.length;
+      loadTrack(currentIndex);
+      play();
+    });
+    nextBtn.addEventListener('click', ()=>{
+      currentIndex = (currentIndex + 1) % songs.length;
+      loadTrack(currentIndex);
+      play();
+    });
+
+    function renderTracks(list){
+      trackListEl.innerHTML = '';
+      list.forEach((s,i)=>{
+        const li = document.createElement('li');
+        li.className = 'track-item';
+        li.innerHTML = `<img src=\"${s.img}\" alt=\"${s.title}\">
+                        <div class=\"track-meta\"><strong>${s.title}</strong><span>${s.artist}</span></div>`;
+        li.addEventListener('click', ()=>{
+          currentIndex = songs.findIndex(x=>x.id===s.id);
+          loadTrack(currentIndex);
+          play();
+        });
+        trackListEl.appendChild(li);
+      });
+    }
+
+    function renderPreview(){
+      previewListEl.innerHTML = '';
+      songs.slice(0,5).forEach(s=>{
+        const li = document.createElement('li');
+        li.innerHTML = `<img src=\"${s.img}\" alt=\"\"><div style=\"font-size:13px\">${s.title}</div>`;
+        previewListEl.appendChild(li);
+      });
+    }
+
+    audio.addEventListener('timeupdate', ()=>{
+      if(audio.duration){
+        const pct = (audio.currentTime / audio.duration) * 100;
+        progress.value = pct;
+        currentTimeEl.textContent = formatTime(audio.currentTime);
+        durationEl.textContent = formatTime(audio.duration);
+      }
+    });
+
+    progress.addEventListener('input', ()=>{
+      if(audio.duration){
+        audio.currentTime = (progress.value/100) * audio.duration;
+      }
+    });
+
+    volumeEl.addEventListener('input', ()=> audio.volume = volumeEl.value);
+    audio.addEventListener('ended', ()=> nextBtn.click());
+
+    searchInput.addEventListener('input', ()=>{
+      const q = searchInput.value.toLowerCase().trim();
+      const filtered = songs.filter(s=> s.title.toLowerCase().includes(q) || s.artist.toLowerCase().includes(q));
+      renderTracks(filtered);
+    });
+
+    // init
+    renderTracks(songs);
+    renderPreview();
+    loadTrack(currentIndex);
+    audio.volume = volumeEl.value;
+  </script>
+</body>
+</html>
